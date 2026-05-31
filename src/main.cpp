@@ -1,0 +1,237 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cstdint>
+#include <sstream>
+#include <limits>
+#include <filesystem>
+#include <future>
+#include <stdexcept>
+
+#include "./include/BS_thread_pool.hpp"
+#include "./include/interface.h"
+#include "./include/sniff.h"
+#include "./include/network_config.h"
+
+using namespace std;
+using namespace BS;
+
+inline void parsePorts(const string &input, vector<uint16_t> &target)
+{
+  istringstream iss(input);
+  string port_str;
+
+  while (iss >> port_str)
+  {
+    try
+    {
+      int port_int = stoi(port_str);
+
+      if (port_int > 0 && port_int <= 65535)
+      {
+        target.push_back(static_cast<uint16_t>(port_int));
+      }
+      else
+      {
+        cerr << "Warning: Port number " << port_str << " is out of valid range (1-65535) and was skipped." << endl;
+      }
+    }
+    catch (const invalid_argument &e)
+    {
+      cerr << "Warning: Invalid port format '" << port_str << "' found and was skipped." << endl;
+    }
+    catch (const out_of_range &e)
+    {
+      cerr << "Warning: Port number " << port_str << " is too large and was skipped." << endl;
+    }
+  }
+}
+
+int main(int argc, char *argv[])
+{
+  // Argument
+  if (argc > 2)
+  {
+    cerr << "Warning: You didn't provide any extra arguments!" << endl;
+    return 1;
+  }
+  if (argc > 1 && argc < 3)
+  {
+    string arg = argv[1];
+    if (arg == "--network-config")
+    {
+      cout << "Network Configuration:" << endl;
+      vector<string> interfaceName = getInterfaceName();
+      vector<NetworkConfig> configuredInterfaces;
+      ofstream net_config("hids_network.conf");
+      for (const string &iface : interfaceName)
+      {
+        net_config << iface + "\n";
+
+        NetworkConfig conf;
+        char yesno;
+        string input;
+
+        conf.NAME = iface;
+        conf.IP = getIpInterface(iface);
+        cout << "\nConfiguring services for interface: " << iface << "\n";
+
+        auto askService = [&](const string &name, bool &flag, vector<uint16_t> &ports)
+        {
+          cout << name << " Service? [y/n]: ";
+          cin >> yesno;
+          cin.ignore(numeric_limits<streamsize>::max(), '\n');
+          bool enabled = (yesno == 'y' || yesno == 'Y');
+          flag = enabled;
+          if (enabled)
+          {
+            cout << "Enter " << name << " port(s) (space separated): ";
+            getline(cin, input);
+            parsePorts(input, ports);
+          }
+        };
+
+        askService("HTTP", conf.HTTP_SERVERS, conf.HTTP_PORTS);
+        askService("SSH", conf.SSH_SERVERS, conf.SSH_PORTS);
+        askService("FTP", conf.FTP_SERVERS, conf.FTP_PORTS);
+
+        configuredInterfaces.push_back(conf);
+
+        net_config << "NAME=" + conf.NAME + "\n";
+        net_config << "IP=" + conf.IP + "\n";
+        net_config << "HTTP_SERVERS=" << (conf.HTTP_SERVERS ? "1" : "0") << "\n";
+        if (conf.HTTP_SERVERS)
+        {
+          net_config << "HTTP_PORTS=";
+          for (size_t i = 0; i < conf.HTTP_PORTS.size(); ++i)
+          {
+            if (i > 0 && i < conf.HTTP_PORTS.size())
+            {
+              net_config << ",";
+              net_config << conf.HTTP_PORTS[i];
+            }
+            else
+            {
+              net_config << conf.HTTP_PORTS[i];
+            }
+          }
+          net_config << "\n";
+        }
+        net_config << "SSH_SERVERS=" << (conf.SSH_SERVERS ? "1" : "0") << "\n";
+        if (conf.SSH_SERVERS)
+        {
+          net_config << "SSH_PORTS=";
+          for (size_t i = 0; i < conf.SSH_PORTS.size(); ++i)
+          {
+            if (i > 0) net_config << ",";
+            net_config << conf.SSH_PORTS[i];
+          }
+          net_config << "\n";
+        }
+        net_config << "FTP_SERVERS=" << (conf.FTP_SERVERS ? "1" : "0") << "\n";
+        if (conf.FTP_SERVERS)
+        {
+          net_config << "FTP_PORTS=";
+          for (size_t i = 0; i < conf.FTP_PORTS.size(); ++i)
+          {
+            if (i > 0) net_config << ",";
+            net_config << conf.FTP_PORTS[i];
+          }
+          net_config << "\n";
+        }
+        net_config << "END" << "\n\n";
+      }
+      net_config.close();
+      filesystem::copy("hids_network.conf", "/etc/hids_network.conf", filesystem::copy_options::overwrite_existing);
+    }
+    else if (arg == "--version" || arg == "-v")
+    {
+      cout << "HIDS Version 1.0" << endl;
+    }
+    else if (arg == "--help" || arg == "-h")
+    {
+      cout << "HIDS - Host-based Intrusion Prevention System\n"
+              "Usage: hids [options]\n\n"
+              "Options:\n"
+              "  --network-config       Generate network configuration file\n"
+              "  -v, --version          Show version information\n"
+              "  -h, --help             Show this help message\n";
+      "  --uninstall            Uninstalling\n";
+    }
+    else if (arg == "--uninstall")
+    {
+      if (geteuid() != 0)
+      {
+        cerr << "Error: You must run this command as root (sudo)." << endl;
+        return 1;
+      }
+
+      cout << "Uninstalling HIDS..." << endl;
+
+      [[maybe_unused]] int stop_res = system("systemctl stop hids 2>/dev/null");
+      [[maybe_unused]] int dis_res = system("systemctl disable hids 2>/dev/null");
+
+      vector<string> files_to_remove = {
+          "/etc/hids_threshold.conf",
+          "/etc/hids_network.conf",
+          "/etc/systemd/system/hids.service",
+          "/usr/local/bin/hids"};
+
+      for (const auto &file : files_to_remove)
+      {
+        try
+        {
+          if (filesystem::exists(file))
+          {
+            filesystem::remove(file);
+            cout << "Removed: " << file << endl;
+          }
+          else
+          {
+            cout << "Skipped (not found): " << file << endl;
+          }
+        }
+        catch (const filesystem::filesystem_error &e)
+        {
+          cerr << "Error removing " << file << ": " << e.what() << endl;
+        }
+      }
+
+      system("systemctl daemon-reload");
+
+      cout << "Uninstallation complete." << endl;
+      return 0;
+    }
+    else
+    {
+      cerr << "Invalid argument: " << arg << endl;
+      return 1;
+    }
+    return 0;
+  }
+
+  vector<NetworkConfig> configuredInterfaces = load_network_config("/etc/hids_network.conf");
+  thread_pool pool(configuredInterfaces.size());
+  vector<future<void>> task;
+
+  // Sniffer
+  for (NetworkConfig &conf : configuredInterfaces)
+  {
+    task.push_back(pool.submit_task([conf]() mutable
+    {
+      try {
+        sniff(conf);
+      }
+      catch (const exception& e)
+      {
+        cout << string("sniff exception: ") + e.what();
+      }
+    }));
+  }
+
+  for (auto &t : task)
+  {
+    t.wait();
+  }
+  return 0;
+}
