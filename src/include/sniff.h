@@ -67,7 +67,6 @@ inline void sniff(NetworkConfig &conf)
 
   const int SYN_PPS_LIMIT = app_config.syn_pps_limit;
 
-  const int UNREACH_COUNT_LIMIT = app_config.unreach_count_limit;
   const int UDP_PPS_LIMIT = app_config.udp_pps_limit;
 
   const int SSH_LOGIN_FAIL_LIMIT = app_config.ssh_login_fail_limit;
@@ -416,40 +415,6 @@ inline void sniff(NetworkConfig &conf)
         udp_connect.packet_count++;
         udp_connect.last_seen = SystemClock::now();
 
-        uint16_t port_connect = define_port_connect(pdu, ip_key);
-        auto it = find(udp_connect.port_list.begin(), udp_connect.port_list.end(), port_connect);
-        if (it == udp_connect.port_list.end())
-        {
-          udp_connect.port_list.push_back(port_connect);
-        }
-
-        if (ip.src_addr().to_string() == ip_key)
-        {
-          if (!portList.count(port_connect))
-          {
-            udp_connect.unreach_count++;
-          }
-        }
-
-        if (udp_connect.unreach_count > UNREACH_COUNT_LIMIT && udp_connect.udp_flood == false)
-        {
-          cout << "[ALERT] UDP Flood DETECTED" << endl;
-          udp_connect.udp_flood = true;
-          if(app_config.mode && udp_connect.blocked == false) {
-            block_ip(client_ip, BLOCK_TIMEOUT);
-            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "DoS/DDoS", "UDP Flood", "Block");
-            udp_connect.blocked = true;
-          }
-          else
-          {
-            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "DoS/DDoS", "UDP Flood", "Alert");
-          }
-        }
-        else
-        {
-          return true;
-        }
-
         auto duration = udp_connect.last_seen - udp_connect.first_seen;
         auto elapsed_seconds = chrono::duration_cast<chrono::seconds>(duration);
         if (elapsed_seconds.count() > 0)
@@ -483,16 +448,6 @@ inline void sniff(NetworkConfig &conf)
         udp_connect.last_seen = SystemClock::now();
         udp_connect.packet_count = 1;
 
-        uint16_t port_connect = define_port_connect(pdu, ip_key);
-        udp_connect.port_list.push_back(port_connect);
-
-        if (ip.src_addr().to_string() == ip_key)
-        {
-          if (!portList.count(udp->dport()))
-          {
-            udp_connect.unreach_count++;
-          }
-        }
         udpConnectMap[ip_key] = udp_connect;
       }
     }

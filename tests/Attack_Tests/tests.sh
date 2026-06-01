@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TARGET="192.168.122.109"
+TARGET="192.168.122.227"
 USERNAME="fruitto"
 WORDLIST="clarkson-university-82.txt"
 ROUNDS=10

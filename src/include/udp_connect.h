@@ -13,9 +13,7 @@ struct UDP_Connect
   string ip;
   chrono::system_clock::time_point first_seen;
   chrono::system_clock::time_point last_seen;
-  vector<uint16_t> port_list;
   long int packet_count = 0;
-  int unreach_count = 0;
 
   bool udp_flood = false;
   bool blocked = false;
