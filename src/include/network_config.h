@@ -26,6 +26,8 @@ struct NetworkConfig
    bool HTTP_SERVERS = false;
    bool SSH_SERVERS = false;
    bool FTP_SERVERS = false;
+
+   bool PCAP_LOG = true;
 };
 
 void block_ip(const std::string &ip_address, std::chrono::minutes minutes)
@@ -33,12 +35,6 @@ void block_ip(const std::string &ip_address, std::chrono::minutes minutes)
    if (ip_address.empty())
       return;
 
-   // Skip if this IP is already blocked. The program processes packets much
-   // faster than iptables installs the DROP rule, so a continuing attack would
-   // otherwise trigger block_ip() over and over, stacking duplicate iptables
-   // rules and 'at' unblock jobs. We block once and let iptables drop the rest;
-   // the entry is allowed to expire together with the scheduled unblock so the
-   // same IP can be blocked again if it attacks after the timeout.
    static std::mutex blocked_mutex;
    static std::unordered_map<std::string, std::chrono::steady_clock::time_point> blocked_until;
    {
@@ -152,6 +148,9 @@ std::vector<NetworkConfig> load_network_config(const std::string &filename)
          currentConf.SSH_PORTS = parsePortsFromString(value);
       else if (key == "FTP_PORTS")
          currentConf.FTP_PORTS = parsePortsFromString(value);
+
+      else if (key == "PCAP_LOG")
+         currentConf.PCAP_LOG = (value == "1");
    }
 
    file.close();

@@ -95,6 +95,11 @@ int main(int argc, char *argv[])
         askService("SSH", conf.SSH_SERVERS, conf.SSH_PORTS);
         askService("FTP", conf.FTP_SERVERS, conf.FTP_PORTS);
 
+        cout << "Packet Capture (pcap) Logging? [y/n]: ";
+        cin >> yesno;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        conf.PCAP_LOG = (yesno == 'y' || yesno == 'Y');
+
         configuredInterfaces.push_back(conf);
 
         net_config << "NAME=" + conf.NAME + "\n";
@@ -139,6 +144,7 @@ int main(int argc, char *argv[])
           }
           net_config << "\n";
         }
+        net_config << "PCAP_LOG=" << (conf.PCAP_LOG ? "1" : "0") << "\n";
         net_config << "END" << "\n\n";
       }
       net_config.close();

@@ -423,6 +423,11 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     http.pending_path = url_path;
     if (http.apiMap.find(url_path) == http.apiMap.end())
     {
+      static const size_t MAX_TRACKED_PATHS = 256;
+      if (http.apiMap.size() >= MAX_TRACKED_PATHS)
+      {
+        http.apiMap.erase(http.apiMap.begin());
+      }
       http.apiMap[url_path] = vector<int>();
     }
   }

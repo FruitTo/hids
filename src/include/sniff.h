@@ -88,8 +88,17 @@ inline void sniff(NetworkConfig &conf)
   string currentDay = currentDate();
   string currentTime = timeStamp();
   string currentPath = "/var/log/hids/" + getPath();
-  filesystem::create_directories(currentPath);
-  auto writer = make_unique<PacketWriter>(currentPath + conf.NAME + "_" + currentDay + "_" + currentTime + ".pcap", DataLinkType<EthernetII>());
+  unique_ptr<PacketWriter> writer;
+  if (conf.PCAP_LOG)
+  {
+    cout << "[INFO] Packet Capture Logging Enabled" << endl;
+    filesystem::create_directories(currentPath);
+    writer = make_unique<PacketWriter>(currentPath + conf.NAME + "_" + currentDay + "_" + currentTime + ".pcap", DataLinkType<EthernetII>());
+  }
+  else
+  {
+    cout << "[INFO] Packet Capture Logging Disabled" << endl;
+  }
 
   // Map
   unordered_map<string, SSH_State> sshMap;
@@ -146,20 +155,23 @@ inline void sniff(NetworkConfig &conf)
     IP &ip = pdu->rfind_pdu<IP>();
 
     // Write Pcap Log
-    string date = currentDate();
-    string path = getPath();
-    if (currentDay != date)
+    if (conf.PCAP_LOG)
     {
-      currentDay = date;
-      currentPath = path;
-      filesystem::create_directories(currentPath);
-      string ts = timeStamp();
-      writer = make_unique<PacketWriter>
-      (
-        currentPath + conf.NAME + "_" + currentDay + "_" + ts + ".pcap", DataLinkType<EthernetII>()
-      );
+      string date = currentDate();
+      string path = getPath();
+      if (currentDay != date)
+      {
+        currentDay = date;
+        currentPath = path;
+        filesystem::create_directories(currentPath);
+        string ts = timeStamp();
+        writer = make_unique<PacketWriter>
+        (
+          currentPath + conf.NAME + "_" + currentDay + "_" + ts + ".pcap", DataLinkType<EthernetII>()
+        );
+      }
+      writer->write(pkt);
     }
-    writer->write(pkt);
 
     string client_ip = (ip.src_addr().to_string() != conf.IP) ? ip.src_addr().to_string() : ip.dst_addr().to_string();
     string server_ip = (ip.src_addr().to_string() == conf.IP) ? ip.src_addr().to_string() : ip.dst_addr().to_string();
