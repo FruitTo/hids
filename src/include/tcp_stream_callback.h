@@ -105,40 +105,6 @@ string html_entity_decode(const string &data)
   return result;
 }
 
-// void save_xss_result(const string &payload, bool detected, const string &attack_type, const string &action)
-// {
-//   static mutex file_mutex;
-//   lock_guard<mutex> lock(file_mutex);
-//   ofstream outfile("xss_detection_log.txt", ios::app);
-//   if (outfile.is_open()) {
-//     if (detected) {
-//       outfile << "[" << action << "] " << attack_type << " | " << payload << endl;
-//     } else {
-//       outfile << "[BYPASSED] No pattern matched | " << payload << endl;
-//     }
-//     outfile.close();
-//   }
-// }
-
-void save_traversal_result(const string &payload, bool detected, const string &attack_type, const string &action)
-{
-  static mutex file_mutex;
-  lock_guard<mutex> lock(file_mutex);
-  ofstream outfile("traversal_detection_log.txt", ios::app);
-  if (outfile.is_open())
-  {
-    if (detected)
-    {
-      outfile << "[" << action << "] " << attack_type << " | " << payload << endl;
-    }
-    else
-    {
-      outfile << "[BYPASSED] No pattern matched | " << payload << endl;
-    }
-    outfile.close();
-  }
-}
-
 // Forward (client -> server)
 void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, pqxx::connection &conn, chrono::minutes ips_timeout, AppConfig &app_config)
 {
@@ -151,20 +117,18 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   const Stream::payload_type &payload = stream.client_payload();
   string data(payload.begin(), payload.end());
 
-  static regex ref_pattern(R"((\r?\n)referer:[^\r\n]*)");
-  data = regex_replace(data, ref_pattern, "");
   string decoded_data = url_decode(data);
   decoded_data = html_entity_decode(decoded_data);
   for (size_t i = 0; i < decoded_data.length(); ++i)
   {
-    if (decoded_data[i] == '+')
-      decoded_data[i] = ' ';
+    if (decoded_data[i] == '+') decoded_data[i] = ' ';
   }
-
-  smatch match;
-
   string lower_data = decoded_data;
   transform(lower_data.begin(), lower_data.end(), lower_data.begin(), ::tolower);
+  static regex ref_pattern(R"((\r?\n)referer:[^\r\n]*)");
+  data = regex_replace(lower_data, ref_pattern, "");
+
+  smatch match;
 
   // SQL Injection
   bool sql_injection_detected = false;
@@ -172,7 +136,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, sql_comment_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
-    cout << "[ALERT] SQL Comment Injection" << endl;
+    cout << "[ALERT] SQL Injection Detected (Comment)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
@@ -187,7 +151,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, and_or_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
-    cout << "[ALERT] SQL AND, OR Injection" << endl;
+    cout << "[ALERT] SQL Injection Detected (AND/OR)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
@@ -202,7 +166,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, order_by_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
-    cout << "[ALERT] SQL Order By Injection" << endl;
+    cout << "[ALERT] SQL Injection Detected (Order By)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
@@ -217,7 +181,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, union_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
-    cout << "[ALERT] SQL Union Injection" << endl;
+    cout << "[ALERT] SQL Injection Detected (UNION)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
@@ -232,15 +196,15 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, call_func_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
-    cout << "[ALERT] SQL Call DB Function" << endl;
+    cout << "[ALERT] SQL Injection Detected (Function Call)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Call Function Injection", "Block");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Function Call Injection", "Block");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Call Function Injection", "Alert");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Function Call Injection", "Alert");
     }
   }
 
@@ -257,17 +221,15 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, script_injection_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (Script Tag Injection)" << endl;
+    cout << "[ALERT] XSS Detected (Script Tag)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Injection", "Block");
-      // save_xss_result(lower_data, true, "Script Tag Injection", "BLOCK");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Tag", "Block");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Injection", "Alert");
-      // save_xss_result(lower_data, true, "Script Tag Injection", "ALERT");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Tag", "Alert");
     }
   }
 
@@ -278,17 +240,15 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, protocol_injection_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (Protocol Injection)" << endl;
+    cout << "[ALERT] XSS Detected (Protocol Handler)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Protocol Injection", "Block");
-      // save_xss_result(lower_data, true, "Protocol Injection", "BLOCK");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Protocol Handler", "Block");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Protocol Injection", "Alert");
-      // save_xss_result(lower_data, true, "Protocol Injection", "ALERT");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Protocol Handler", "Alert");
     }
   }
 
@@ -303,17 +263,15 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, css_xss_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (CSS Injection)!" << endl;
+    cout << "[ALERT] XSS Detected (CSS)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "CSS Injection", "Block");
-      // save_xss_result(lower_data, true, "CSS Injection", "BLOCK");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "CSS", "Block");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "CSS Injection", "Alert");
-      // save_xss_result(lower_data, true, "CSS Injection", "ALERT");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "CSS", "Alert");
     }
   }
 
@@ -326,17 +284,15 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, event_injection_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (Event Handler Injection)!" << endl;
+    cout << "[ALERT] XSS Detected (Event Handler)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Block");
-      // save_xss_result(lower_data, true, "Event Handler Injection", "BLOCK");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler", "Block");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Alert");
-      // save_xss_result(lower_data, true, "Event Handler Injection", "ALERT");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler", "Alert");
     }
   }
 
@@ -350,17 +306,15 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, js_execution_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (JavaScript Execution)!" << endl;
+    cout << "[ALERT] XSS Detected (JavaScript Execution)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "JavaScript Execution", "Block");
-      // save_xss_result(lower_data, true, "JavaScript Execution", "BLOCK");
     }
     else
     {
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "JavaScript Execution", "Alert");
-      // save_xss_result(lower_data, true, "JavaScript Execution", "ALERT");
     }
   }
 
@@ -372,17 +326,15 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, dangerous_tag_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (Dangerous HTML Tag)!" << endl;
+    cout << "[ALERT] XSS Detected (Dangerous HTML Tag)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Dangerous HTML Tag", "Block");
-      // save_xss_result(lower_data, true, "Dangerous HTML Tag", "BLOCK");
     }
     else
     {
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Dangerous HTML Tag", "Alert");
-      // save_xss_result(lower_data, true, "Dangerous HTML Tag", "ALERT");
     }
   }
 
@@ -397,25 +349,17 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, obfuscation_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (Obfuscation Technique)!" << endl;
+    cout << "[ALERT] XSS Detected (Obfuscation)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Obfuscation Technique", "Block");
-      // save_xss_result(lower_data, true, "Obfuscation Technique", "BLOCK");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Obfuscation", "Block");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Obfuscation Technique", "Alert");
-      // save_xss_result(lower_data, true, "Obfuscation Technique", "ALERT");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Obfuscation", "Alert");
     }
   }
-
-  // Log bypassed payloads
-  // if (!xss_detected)
-  // {
-  //   save_xss_result(lower_data, false, "", "BYPASSED");
-  // }
 
   // Directory Traversal
   bool access_control_detected = false;
@@ -429,13 +373,11 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Directory Traversal", "Directory Traversal", "Block");
-      // save_traversal_result(lower_data, true, "Directory Traversal", "BLOCK");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Directory Traversal", "Path Traversal", "Block");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Directory Traversal", "Directory Traversal", "Alert");
-      // save_traversal_result(lower_data, true, "Directory Traversal", "ALERT");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Directory Traversal", "Path Traversal", "Alert");
     }
   }
 
@@ -445,24 +387,17 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, lfi_pattern) && !access_control_detected && !xss_detected)
   {
     access_control_detected = true;
-    cout << "[ALERT] System File Access Attempt (LFI) Detected" << endl;
+    cout << "[ALERT] Local File Inclusion Detected (LFI)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Directory Traversal", "System File Access Attempt (LFI)", "Block");
-      // save_traversal_result(lower_data, true, "System File Access Attempt (LFI)", "BLOCK");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Directory Traversal", "Local File Inclusion (LFI)", "Block");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Directory Traversal", "System File Access Attempt (LFI)", "Alert");
-      // save_traversal_result(lower_data, true, "System File Access Attempt (LFI)", "ALERT");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Directory Traversal", "Local File Inclusion (LFI)", "Alert");
     }
   }
-
-  // if (!access_control_detected)
-  // {
-  //   save_traversal_result(lower_data, false, "", "BYPASSED");
-  // }
 
   // Brute Force
   static regex http_start_pattern(R"(^(get|post|put|delete|head|options|patch)[\s\+]+([^?\s]+))");
@@ -527,7 +462,7 @@ void on_server_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       if (http.http_brute_force == false)
       {
-        cout << "[ALERT] Web Brute Focrce Detected" << endl;
+        cout << "[ALERT] Web Brute Force Detected" << endl;
         if (app_config.mode && http.http_brute_force == false)
         {
           block_ip(client_ip, ips_timeout);

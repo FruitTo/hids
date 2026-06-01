@@ -8,6 +8,9 @@
 #include <string>
 #include <algorithm>
 #include <cstdint>
+#include <chrono>
+#include <mutex>
+#include <unordered_map>
 
 #include "utils.h"
 
@@ -29,6 +32,23 @@ void block_ip(const std::string &ip_address, std::chrono::minutes minutes)
 {
    if (ip_address.empty())
       return;
+
+   // Skip if this IP is already blocked. The program processes packets much
+   // faster than iptables installs the DROP rule, so a continuing attack would
+   // otherwise trigger block_ip() over and over, stacking duplicate iptables
+   // rules and 'at' unblock jobs. We block once and let iptables drop the rest;
+   // the entry is allowed to expire together with the scheduled unblock so the
+   // same IP can be blocked again if it attacks after the timeout.
+   static std::mutex blocked_mutex;
+   static std::unordered_map<std::string, std::chrono::steady_clock::time_point> blocked_until;
+   {
+      std::lock_guard<std::mutex> lock(blocked_mutex);
+      auto now = std::chrono::steady_clock::now();
+      auto it = blocked_until.find(ip_address);
+      if (it != blocked_until.end() && now < it->second)
+         return; // already blocked, do nothing
+      blocked_until[ip_address] = now + minutes;
+   }
 
    std::string block_input      = "sudo iptables -I INPUT -s " + ip_address + " -j DROP";
    std::string unblock_input    = "sudo iptables -D INPUT -s " + ip_address + " -j DROP";

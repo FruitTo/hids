@@ -227,7 +227,7 @@ inline void sniff(NetworkConfig &conf)
         {
           if ((icmp_connect.packet_count / elapsed_seconds.count()) > ICMP_PPS_LIMIT && icmp_connect.icmp_flood == false)
           {
-            cout << "[ALERT] ICMP Flood DETECTED" << endl;
+            cout << "[ALERT] ICMP Flood Detected" << endl;
             icmp_connect.icmp_flood = true;
             if(app_config.mode && icmp_connect.blocked == false) {
               block_ip(client_ip, BLOCK_TIMEOUT);
@@ -307,7 +307,7 @@ inline void sniff(NetworkConfig &conf)
           auto since_null = chrono::duration_cast<chrono::seconds>(SystemClock::now() - ip_connect.null_scan_detected_at);
           if (since_null > PORT_CONNECT_DURATION_LIMIT)
           {
-            cout << "[ALERT] NULL SCAN DETECTED" << endl;
+            cout << "[ALERT] Null Scan Detected" << endl;
             ip_connect.null_scan_detected_at = SystemClock::now();
             log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, "tcp", "Port Scan", "Null Scan", "Alert");
           }
@@ -317,7 +317,7 @@ inline void sniff(NetworkConfig &conf)
           auto since_full_xmas = chrono::duration_cast<chrono::seconds>(SystemClock::now() - ip_connect.full_xmas_scan_detected_at);
           if (since_full_xmas > PORT_CONNECT_DURATION_LIMIT)
           {
-            cout << "[ALERT] TCP FULL XMAS SCAN DETECTED" << endl;
+            cout << "[ALERT] Full Xmas Scan Detected" << endl;
             ip_connect.full_xmas_scan_detected_at = SystemClock::now();
             log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, "tcp", "Port Scan", "Full Xmas Scan", "Alert");
           }
@@ -327,7 +327,7 @@ inline void sniff(NetworkConfig &conf)
           auto since_xmas = chrono::duration_cast<chrono::seconds>(SystemClock::now() - ip_connect.std_xmas_scan_detected_at);
           if (since_xmas > PORT_CONNECT_DURATION_LIMIT)
           {
-            cout << "[ALERT] Standard Nmap Xmas Scan DETECTED" << endl;
+            cout << "[ALERT] Xmas Scan Detected" << endl;
             ip_connect.std_xmas_scan_detected_at = SystemClock::now();
             log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, "tcp", "Port Scan", "Xmas Scan", "Alert");
           }
@@ -337,18 +337,18 @@ inline void sniff(NetworkConfig &conf)
           auto since_port_scan = chrono::duration_cast<chrono::seconds>(SystemClock::now() - ip_connect.port_scan_detected_at);
           if (since_port_scan > PORT_CONNECT_DURATION_LIMIT)
           {
-            cout << "[ALERT] PORT SCAN DETECTED" << endl;
+            cout << "[ALERT] Port Scan Detected" << endl;
             ip_connect.port_scan_detected_at = SystemClock::now();
             ip_connect.port_scan = true;
             if (app_config.mode && ip_connect.blocked == false)
             {
               block_ip(client_ip, BLOCK_TIMEOUT);
-              log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Syn Scan/Full Scan", "Block");
+              log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "SYN/Full Scan", "Block");
               ip_connect.blocked = true;
             }
             else
             {
-              log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Syn Scan/Full Scan", "Alert");
+              log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "SYN/Full Scan", "Alert");
             }
           }
         }
@@ -363,19 +363,19 @@ inline void sniff(NetworkConfig &conf)
             && since_syn_flood > PORT_CONNECT_DURATION_LIMIT
             && ip_connect.port_scan == false)
         {
-          cout << "[ALERT] SYN FLOOD DETECTED" << endl;
+          cout << "[ALERT] SYN Flood Detected" << endl;
           ip_connect.syn_flood_detected_at = SystemClock::now();
           ip_connect.syn_count = 0;
           ip_connect.syn_first_seen_set = false;
           if(app_config.mode && ip_connect.blocked == false) {
             block_ip(client_ip, BLOCK_TIMEOUT);
-            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "DoS/DDoS", "Syn Flood", "Block");
+            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "DoS/DDoS", "SYN Flood", "Block");
             ip_connect.blocked = true;
             ip_connect.syn_flood = true;
           }
           else
           {
-            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "DoS/DDoS", "Syn Flood", "Alert");
+            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "DoS/DDoS", "SYN Flood", "Alert");
           }
         }
       }
@@ -421,11 +421,11 @@ inline void sniff(NetworkConfig &conf)
         {
           if ((udp_connect.packet_count / elapsed_seconds.count()) > UDP_PPS_LIMIT && udp_connect.udp_flood == false)
           {
-            cout << "[ALERT] UDP Flood DETECTED" << endl;
+            cout << "[ALERT] UDP Flood Detected" << endl;
             udp_connect.udp_flood = true;
             if(app_config.mode && udp_connect.blocked == false) {
               block_ip(client_ip, BLOCK_TIMEOUT);
-              log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "DoS/DDoS",  "UDP Flood", "Block");
+              log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "DoS/DDoS", "UDP Flood", "Block");
               udp_connect.blocked = true;
             }
             else
@@ -469,7 +469,7 @@ inline void sniff(NetworkConfig &conf)
         {
           if (ssh.ssh_brute_force == false)
           {
-            cout << "[ALERT] SSH BRUTE FORCE DETECTED RATE" << endl;
+            cout << "[ALERT] SSH Brute Force Detected" << endl;
             ssh.ssh_brute_force = true;
             if(app_config.mode && ssh.blocked == false) {
               block_ip(client_ip, BLOCK_TIMEOUT);
@@ -490,7 +490,7 @@ inline void sniff(NetworkConfig &conf)
         {
           if (ssh.ssh_brute_force == false)
           {
-            cout << "[ALERT] SSH BRUTE FORCE DETECTED" << endl;
+            cout << "[ALERT] SSH Brute Force Detected" << endl;
             ssh.ssh_brute_force = true;
             if(app_config.mode && ssh.blocked == false)
             {
@@ -539,7 +539,7 @@ inline void sniff(NetworkConfig &conf)
         {
           if (ftp.ftp_brute_force == false)
           {
-            cout << "[ALERT] FTP BRUTE FORCE DETECTED RATE" << endl;
+            cout << "[ALERT] FTP Brute Force Detected" << endl;
             ftp.ftp_brute_force = true;
             if(app_config.mode && ftp.blocked == false) {
               block_ip(client_ip, BLOCK_TIMEOUT);
@@ -561,7 +561,7 @@ inline void sniff(NetworkConfig &conf)
         {
           if (ftp.ftp_brute_force == false)
           {
-            cout << "[ALERT] FTP BRUTE FORCE DETECTED" << endl;
+            cout << "[ALERT] FTP Brute Force Detected" << endl;
             ftp.ftp_brute_force = true;
             if(app_config.mode && ftp.blocked == false) {
               block_ip(client_ip, BLOCK_TIMEOUT);
