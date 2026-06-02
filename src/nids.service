@@ -1,12 +1,12 @@
 [Unit]
-Description=HIDS Security Service
+Description=NIDS Security Service
 After=network.target postgresql.service
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/usr/local/bin
-ExecStart=/usr/local/bin/hids
+ExecStart=/usr/local/bin/nids
 Restart=always
 RestartSec=3
 

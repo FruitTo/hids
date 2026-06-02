@@ -1,12 +1,12 @@
-# HIDS - Host-based Intrusion Detection System
+# NIDS - Network-Based Detection System
 
-**HIDS** is a lightweight network security tool designed for **Debian-based Linux systems**. It provides real-time traffic monitoring, intrusion detection, and automatic prevention capabilities (IPS mode) using `iptables`. The system is backed by a PostgreSQL database running in Docker for logging events.
+**NIDS** is a lightweight network security tool designed for **Debian-based Linux systems**. It provides real-time traffic monitoring, intrusion detection, and automatic prevention capabilities (IPS mode) using `iptables`. The system is backed by a PostgreSQL database running in Docker for logging events.
 
 > **Note:** This project is compatible with **Linux Debian-based distributions only** (e.g., Ubuntu, Debian, Kali Linux).
 
 ## 🛡️ Features & Detection Capabilities
 
-This tool operates in two modes, configured via `PREVENTION_MODE` in `hids_threshold.conf`:
+This tool operates in two modes, configured via `PREVENTION_MODE` in `nids_threshold.conf`:
 - **Detection Mode** (`PREVENTION_MODE=0`) — Alerts only, no blocking.
 - **Prevention Mode** (`PREVENTION_MODE=1`) — Alerts and automatically blocks the attacker's IP using `iptables`.
 
@@ -71,7 +71,7 @@ docker compose up -d --build
 make
 
 # 4. Verify installation and check version
-sudo ./hids -v
+sudo ./nids -v
 ```
 
 ---

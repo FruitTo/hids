@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
       cout << "Network Configuration:" << endl;
       vector<string> interfaceName = getInterfaceName();
       vector<NetworkConfig> configuredInterfaces;
-      ofstream net_config("hids_network.conf");
+      ofstream net_config("nids_network.conf");
       for (const string &iface : interfaceName)
       {
         net_config << iface + "\n";
@@ -148,16 +148,16 @@ int main(int argc, char *argv[])
         net_config << "END" << "\n\n";
       }
       net_config.close();
-      filesystem::copy("hids_network.conf", "/etc/hids_network.conf", filesystem::copy_options::overwrite_existing);
+      filesystem::copy("nids_network.conf", "/etc/nids_network.conf", filesystem::copy_options::overwrite_existing);
     }
     else if (arg == "--version" || arg == "-v")
     {
-      cout << "HIDS Version 1.0" << endl;
+      cout << "NIDS Version 1.0" << endl;
     }
     else if (arg == "--help" || arg == "-h")
     {
-      cout << "HIDS - Host-based Intrusion Prevention System\n"
-              "Usage: hids [options]\n\n"
+      cout << "NIDS - Network-Based Detection System\n"
+              "Usage: nids [options]\n\n"
               "Options:\n"
               "  --network-config       Generate network configuration file\n"
               "  -v, --version          Show version information\n"
@@ -172,16 +172,16 @@ int main(int argc, char *argv[])
         return 1;
       }
 
-      cout << "Uninstalling HIDS..." << endl;
+      cout << "Uninstalling NIDS..." << endl;
 
-      [[maybe_unused]] int stop_res = system("systemctl stop hids 2>/dev/null");
-      [[maybe_unused]] int dis_res = system("systemctl disable hids 2>/dev/null");
+      [[maybe_unused]] int stop_res = system("systemctl stop nids 2>/dev/null");
+      [[maybe_unused]] int dis_res = system("systemctl disable nids 2>/dev/null");
 
       vector<string> files_to_remove = {
-          "/etc/hids_threshold.conf",
-          "/etc/hids_network.conf",
-          "/etc/systemd/system/hids.service",
-          "/usr/local/bin/hids"};
+          "/etc/nids_threshold.conf",
+          "/etc/nids_network.conf",
+          "/etc/systemd/system/nids.service",
+          "/usr/local/bin/nids"};
 
       for (const auto &file : files_to_remove)
       {
@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
     return 0;
   }
 
-  vector<NetworkConfig> configuredInterfaces = load_network_config("/etc/hids_network.conf");
+  vector<NetworkConfig> configuredInterfaces = load_network_config("/etc/nids_network.conf");
   thread_pool pool(configuredInterfaces.size());
   vector<future<void>> task;
 

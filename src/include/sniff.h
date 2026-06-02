@@ -45,7 +45,7 @@ using SystemClock = chrono::system_clock;
 inline void sniff(NetworkConfig &conf)
 {
   AppConfig app_config;
-  load_config("/etc/hids_threshold.conf", app_config);
+  load_config("/etc/nids_threshold.conf", app_config);
 
   if (app_config.mode)
     cout << "[INFO] Prevention Mode Enabled" << endl;
@@ -87,7 +87,7 @@ inline void sniff(NetworkConfig &conf)
   // Initial Log Variable
   string currentDay = currentDate();
   string currentTime = timeStamp();
-  string currentPath = "/var/log/hids/" + getPath();
+  string currentPath = "/var/log/nids/" + getPath();
   unique_ptr<PacketWriter> writer;
   if (conf.PCAP_LOG)
   {

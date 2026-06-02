@@ -580,7 +580,7 @@
     "security",
     "network",
     "attacks",
-    "hids"
+    "nids"
   ],
   "templating": {
     "list": [
@@ -607,8 +607,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "HIDS - Network Attack Monitoring",
-  "uid": "hids_attack_monitor",
+  "title": "NIDS - Network Attack Monitoring",
+  "uid": "nids_attack_monitor",
   "version": 1,
   "weekStart": ""
 }
