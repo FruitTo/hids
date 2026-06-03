@@ -42,23 +42,26 @@ void clean_ssh_state(unordered_map<string, SSH_State> &sshMap, chrono::seconds t
 }
 
 void ssh_read_fail_state(string path, SSH_State& ssh) {
-    const char* filename = path.c_str();
-    auto now_steady = chrono::system_clock::now();
     time_t start_time = chrono::system_clock::to_time_t(ssh.first_seen);
-
-    ifstream file(filename, ios::binary);
+    ifstream file(path, ios::binary | ios::ate);
     if (!file.is_open()) {
         cout << "Cant open btmp file or Permission denied." << endl;
         return;
     }
 
+    streamoff file_size = file.tellg();
+    const streamoff rec = static_cast<streamoff>(sizeof(struct utmp));
+    long num_records = static_cast<long>(file_size / rec);
+
     struct utmp entry;
     int count = 0;
-    while (file.read(reinterpret_cast<char*>(&entry), sizeof(entry))) {
-        // Filter
+    for (long i = num_records - 1; i >= 0; --i) {
+        file.seekg(static_cast<streamoff>(i) * rec, ios::beg);
+        if (!file.read(reinterpret_cast<char*>(&entry), rec)) break;
+
+        if (entry.ut_tv.tv_sec < start_time) break;
         if (entry.ut_type == DEAD_PROCESS && strlen(entry.ut_user) == 0) continue;
         if (entry.ut_user[0] == '\0') continue;
-        if (entry.ut_tv.tv_sec < start_time) continue;
 
         if (ssh.ip == entry.ut_host) {
             count++;

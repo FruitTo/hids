@@ -17,7 +17,7 @@ struct FTP_State
   chrono::system_clock::time_point first_seen;
   chrono::system_clock::time_point last_seen;
   int login_fail = 0;
-
+  streamoff read_offset = 0;
   bool ftp_brute_force = false;
   bool blocked = false;
 };
@@ -57,21 +57,35 @@ time_t convert_log_time_to_time_t(const string &time_str)
 
 void ftp_read_fail_state(string path, FTP_State &ftp)
 {
-  ifstream file(path);
+  ifstream file(path, ios::binary);
   if (!file.is_open())
   {
     cerr << "Cannot open vsftpd log file: " << path << endl;
     return;
   }
-  string line;
-  regex pattern(R"ftp(FAIL LOGIN: Client "(?:::ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")ftp");
+
+  file.seekg(0, ios::end);
+  streamoff file_size = file.tellg();
+  if (file_size < ftp.read_offset)
+  {
+    ftp.read_offset = 0;
+  }
+
+  file.seekg(ftp.read_offset, ios::beg);
+
+  static const regex pattern(R"ftp(FAIL LOGIN: Client "(?:::ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")ftp");
   smatch matches;
 
   time_t start_time = chrono::system_clock::to_time_t(ftp.first_seen);
-  auto now_system = chrono::system_clock::now();
-  int count = 0;
+  string line;
   while (getline(file, line))
   {
+    streamoff after = file.tellg();
+    if (after != -1)
+    {
+      ftp.read_offset = after;
+    }
+
     if (line.length() < 15)
       continue;
     string time_str = line.substr(0, 24);
@@ -80,17 +94,11 @@ void ftp_read_fail_state(string path, FTP_State &ftp)
     {
       continue;
     }
-    if (regex_search(line, matches, pattern))
+    if (regex_search(line, matches, pattern) && ftp.ip == matches[1])
     {
-      string ip = matches[1];
-
-      if (ftp.ip == ip)
-      {
-        count += 1;
-      }
+      ftp.login_fail += 1; // accumulate; offset guarantees each line counts once
     }
   }
-  ftp.login_fail = count;
   file.close();
 }
 
