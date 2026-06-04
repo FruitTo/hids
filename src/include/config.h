@@ -34,8 +34,6 @@ struct AppConfig
   int port_connect_duration_limit = 30;
 
   // --- SYN Flood ---
-  // int syn_connect_limit = 100;
-  // int syn_connect_duration_limit = 30;
   int syn_pps_limit = 30000;
 
   // --- UDP Flood ---
